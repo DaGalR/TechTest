@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "POST /create-order",
+  "type": "object",
+  "properties": {
+    "order_id": { "type": "string" },
+    "user_id": { "type": "string" },
+    "item": { "type": "string" },
+    "quantity": { "type": "integer" },
+    "total_price": { "type": "number" }
+  },
+  "required": ["order_id", "user_id", "item", "quantity", "total_price"],
+  "additionalProperties": false
+}
