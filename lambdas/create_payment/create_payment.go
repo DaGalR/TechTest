@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
@@ -44,21 +45,18 @@ func createPaymentDynamo(payment *CreatePaymentRequest, client *dynamodb.Client)
 	}
 	return nil
 }
-func CreatePaymentHandler(ctx context.Context, req CreatePaymentRequest) (events.APIGatewayProxyResponse, error) {
-	/*payment,err := parseBodyToPaymentRequest(req.Body)
-	if err != nil{
-		return events.APIGatewayProxyResponse{StatusCode: 400, Body: fmt.Sprintf("Error parsing request body: %s", err.Error())}, err
-	}
+func CreatePaymentHandler(ctx context.Context, payment CreatePaymentRequest) (events.APIGatewayProxyResponse, error) {
+
 	config, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(os.Getenv("AWS_REGION")))
 	if err!=nil{
 		return events.APIGatewayProxyResponse{StatusCode: 500, Body: "Error initializing DynamoDB client"} , err
 	}
 	client := dynamodb.NewFromConfig(config)
-	err = createPaymentDynamo(payment, client)
+	err = createPaymentDynamo(&payment, client)
 	if err != nil {
 		return events.APIGatewayProxyResponse{StatusCode: 500, Body: err.Error()}, err
-	}*/
-	return events.APIGatewayProxyResponse{StatusCode: 200, Body: fmt.Sprintf("ORDER: %s PRICE: %.2f", req.OrderID, req.TotalPrice)}, nil
+	}
+	return events.APIGatewayProxyResponse{StatusCode: 200, Body: fmt.Sprintf("PAYMENT CREATED WITH ORDER: %s PRICE: %.2f", payment.OrderID, payment.TotalPrice)}, nil
 }
 
 func main(){
