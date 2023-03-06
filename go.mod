@@ -31,4 +31,5 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression v1.4.43
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.18.6
 	github.com/aws/aws-sdk-go-v2/service/lambda v1.30.0
+	github.com/aws/aws-sdk-go-v2/service/sqs v1.20.4
 )

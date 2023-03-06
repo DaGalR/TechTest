@@ -53,6 +53,11 @@ resource "aws_iam_role_policy_attachment" "lambda_policy" {
    role = aws_iam_role.iam_for_lambda.name
    policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
+
+resource "aws_iam_role_policy_attachment" "lambda_sqs_role_policy" {
+  role       = aws_iam_role.iam_for_lambda.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaSQSQueueExecutionRole"
+}
           
 resource "aws_iam_role_policy" "dynamodb-lambda-policy" {
    name = "dynamodb_lambda_policy"
@@ -69,6 +74,23 @@ resource "aws_iam_role_policy" "dynamodb-lambda-policy" {
    })
 }
 
+resource "aws_iam_role_policy" "sqs-policy" {
+  name        = "sqs-policy"
+  role = aws_iam_role.iam_for_lambda.id
+  policy      = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "sqs:SendMessage"
+        ]
+        Effect   = "Allow"
+        Resource = "${aws_sqs_queue.terraform_queue.arn}"
+      }
+    ]
+  })
+}
+
 data "archive_file" "create-order-archive"{
   source_file = "../bin/create_order"
   output_path = "../bin/create_order.zip"
@@ -81,10 +103,17 @@ data "archive_file" "create-payment-archive"{
   type = "zip"
 }
 
+data "archive_file" "sqs-handler-archive"{
+  source_file = "../bin/sqs_handler"
+  output_path = "../bin/sqs_handler.zip"
+  type = "zip"
+}
+
 resource "aws_lambda_function" "create-order" {
   environment {
     variables = {
-      TABLE_NAME = aws_dynamodb_table.transactions_table.name
+      TABLE_NAME = aws_dynamodb_table.transactions_table.name,
+      SQS_QUEUE = aws_sqs_queue.terraform_queue.id
     }
   }
   memory_size = "128"
@@ -100,7 +129,8 @@ resource "aws_lambda_function" "create-order" {
 resource "aws_lambda_function" "create-payment" {
   environment {
     variables = {
-      TABLE_NAME = aws_dynamodb_table.transactions_table.name
+      TABLE_NAME = aws_dynamodb_table.transactions_table.name,
+      SQS_QUEUE = aws_sqs_queue.terraform_queue.id
     }
   }
   memory_size = "128"
@@ -111,7 +141,19 @@ resource "aws_lambda_function" "create-payment" {
   handler = "create_payment"
   role = aws_iam_role.iam_for_lambda.arn
   filename = data.archive_file.create-payment-archive.output_path
-  }
+}
+
+resource "aws_lambda_function" "lambda_sqs_handler" {
+  memory_size = "128"
+  timeout = 10
+  runtime = "go1.x"
+  architectures = ["x86_64"]
+  function_name = "sqs_handler"
+  handler = "sqs_handler"
+  role = aws_iam_role.iam_for_lambda.arn
+  filename = data.archive_file.sqs-handler-archive.output_path
+}
+
 #API GATEWAY
 resource "aws_api_gateway_rest_api" "api" {
   name = "transactions_api"
@@ -251,9 +293,36 @@ resource "aws_api_gateway_deployment" "transactions_deploy" {
 
 }
 
+#SQS
+resource "aws_sqs_queue" "terraform_queue" {
+  name                      = "api-events-queue"
+  delay_seconds             = 90
+  max_message_size          = 2048
+  message_retention_seconds = 86400
+  receive_wait_time_seconds = 10
+  #redrive_policy            = "{\"deadLetterTargetArn\":\"${aws_sqs_queue.terraform_queue_deadletter.arn}\",\"maxReceiveCount\":3}"
+}
+
+resource "aws_lambda_event_source_mapping" "event_source_mapping" {
+  event_source_arn = aws_sqs_queue.terraform_queue.arn
+  function_name    = aws_lambda_function.create-order.arn
+  enabled          = true
+}
+
+resource "aws_lambda_event_source_mapping" "sqs_event_handler_mapping" {
+  event_source_arn = aws_sqs_queue.terraform_queue.arn
+  function_name    = aws_lambda_function.lambda_sqs_handler.arn
+  enabled          = true
+}
+
+output "sqs-url"{
+  value = "${aws_sqs_queue.terraform_queue.id}"
+}
+
 output "url-order" {
   value = "${aws_api_gateway_deployment.transactions_deploy.invoke_url}${aws_api_gateway_resource.order-resource.path}"
 }
 output "url-payment" {
   value = "${aws_api_gateway_deployment.transactions_deploy.invoke_url}${aws_api_gateway_resource.payment-resource.path}"
 }
+
