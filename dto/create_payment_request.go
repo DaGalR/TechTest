@@ -1,6 +1,6 @@
 package dto
 
 type CreatePaymentRequest struct {
-	OrderID    string  `json:"order_id"`
-	TotalPrice float32 `json:"total_price"`
+	OrderID string `json:"order_id"`
+	Status  string `json:"status"`
 }

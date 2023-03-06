@@ -34,7 +34,7 @@ func CreatePaymentHandler(ctx context.Context, payment dto.CreatePaymentRequest)
 	if err != nil {
 		return events.APIGatewayProxyResponse{StatusCode: 500, Body: err.Error()}, err
 	}
-	return events.APIGatewayProxyResponse{StatusCode: 200, Body: fmt.Sprintf("PAYMENT CREATED WITH ORDER: %s PRICE: %.2f", payment.OrderID, payment.TotalPrice)}, nil
+	return events.APIGatewayProxyResponse{StatusCode: 200, Body: fmt.Sprintf("PAYMENT CREATED WITH ORDER: %s AND STATUS: %s", payment.OrderID, payment.Status)}, nil
 }
 
 func main(){

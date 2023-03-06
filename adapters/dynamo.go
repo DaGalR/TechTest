@@ -52,14 +52,14 @@ func CreatePaymentDynamo(payment *dto.CreatePaymentRequest, client *dynamodb.Cli
 			Item: map[string]types.AttributeValue{
 				"PK":&types.AttributeValueMemberS{Value: pkPayment},
 				"SK":&types.AttributeValueMemberS{Value: fmt.Sprintf(skPayment,payment.OrderID)},
-				"totalPrice":&types.AttributeValueMemberN{Value: fmt.Sprint(payment.TotalPrice)},
+				"status":&types.AttributeValueMemberS{Value: payment.Status},
 			},
 		})
 		if err != nil && strings.Contains(err.Error(), "ConditionalCheckFailedException"){
 			return fmt.Errorf("The payment already exists in Dynamo")
 		}
 		fmt.Print("Updating order...\n")
-		_, err := UpdateOrderStatusDynamo(payment.OrderID, "Complete", client)
+		_, err := UpdateOrderStatusDynamo(payment.OrderID, payment.Status, client)
 		if err != nil{
 			return err
 		}
