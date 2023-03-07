@@ -18,8 +18,21 @@ const skPayment = "ID#%s"
 const pkOrder = "ORDER"
 const skOrder = "ID#%s"
 
-func CreateOrderDynamo(order *dto.CreateOrderRequest, client *dynamodb.Client) error {
-	_, err := client.PutItem(context.Background(), &dynamodb.PutItemInput{
+type DynamoAdapter struct{
+	client DynamoClient
+}
+type DynamoClient interface{
+	GetItem(context.Context, *dynamodb.GetItemInput, ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
+	PutItem(context.Context, *dynamodb.PutItemInput, ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
+	UpdateItem(context.Context, *dynamodb.UpdateItemInput, ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
+}
+func NewDynamoAdapter(client DynamoClient) *DynamoAdapter{
+	return &DynamoAdapter{
+		client: client,
+	}
+}
+func (d *DynamoAdapter) CreateOrder(order *dto.CreateOrderRequest) error {
+	_, err := d.client.PutItem(context.Background(), &dynamodb.PutItemInput{
 		TableName:           aws.String(os.Getenv("TABLE_NAME")),
 		ConditionExpression: aws.String("attribute_not_exists(SK)"),
 		Item: map[string]types.AttributeValue{
@@ -38,15 +51,15 @@ func CreateOrderDynamo(order *dto.CreateOrderRequest, client *dynamodb.Client) e
 	return nil
 }
 
-func CreatePaymentDynamo(payment *dto.CreatePaymentRequest, client *dynamodb.Client) error{
-	order, err := GetOrderDynamo(payment.OrderID, client)
+func (d *DynamoAdapter) CreatePayment(payment *dto.CreatePaymentRequest) error{
+	order, err := d.GetOrder(payment.OrderID)
 	if err != nil{
 		return fmt.Errorf("Could not verify if order with id: " + payment.OrderID + " exists because of: " + err.Error())
 	}
 	if order == (&dto.CreateOrderRequest{}){
 		return fmt.Errorf("There is no order with id: "+ payment.OrderID)
 	}else{
-		_, err = client.PutItem(context.Background(), &dynamodb.PutItemInput{
+		_, err = d.client.PutItem(context.Background(), &dynamodb.PutItemInput{
 			TableName: aws.String(os.Getenv("TABLE_NAME")),
 			ConditionExpression: aws.String("attribute_not_exists(SK)"),
 			Item: map[string]types.AttributeValue{
@@ -58,19 +71,14 @@ func CreatePaymentDynamo(payment *dto.CreatePaymentRequest, client *dynamodb.Cli
 		if err != nil && strings.Contains(err.Error(), "ConditionalCheckFailedException"){
 			return fmt.Errorf("The payment already exists in Dynamo")
 		}
-		fmt.Print("Updating order...\n")
-		_, err := UpdateOrderStatusDynamo(payment.OrderID, payment.Status, client)
-		if err != nil{
-			return err
-		}
 	}
 	return nil
 }
 
-func GetOrderDynamo(orderID string, client *dynamodb.Client) (*dto.CreateOrderRequest, error) {
+func (d *DynamoAdapter) GetOrder(orderID string) (*dto.CreateOrderRequest, error) {
 	order := dto.CreateOrderRequest{}
 	fmt.Printf("LOOKING FOR ORDER WITH ID %s\n",orderID)
-	data, err := client.GetItem(context.Background(), &dynamodb.GetItemInput{
+	data, err := d.client.GetItem(context.Background(), &dynamodb.GetItemInput{
 		TableName: aws.String(os.Getenv("TABLE_NAME")),
 		Key: map[string]types.AttributeValue{
 			"PK": &types.AttributeValueMemberS{Value: pkOrder},
@@ -91,7 +99,7 @@ func GetOrderDynamo(orderID string, client *dynamodb.Client) (*dto.CreateOrderRe
 	return &order,nil
 }
 
-func UpdateOrderStatusDynamo(orderID string, newStatus string, client *dynamodb.Client)(map[string]map[string]interface{}, error){
+func (d *DynamoAdapter) UpdateOrderStatus(orderID string, newStatus string)(map[string]map[string]interface{}, error){
 	update := expression.Set(expression.Name("status"), expression.Value(newStatus))
 	expr, err := expression.NewBuilder().WithUpdate(update).Build()
 	var response *dynamodb.UpdateItemOutput
@@ -99,7 +107,7 @@ func UpdateOrderStatusDynamo(orderID string, newStatus string, client *dynamodb.
 	if err != nil{
 		return attributeMap, fmt.Errorf("Couldn't build expression for order update: %v\n",err)
 	}else{
-		response, err = client.UpdateItem(context.Background(), &dynamodb.UpdateItemInput{
+		response, err = d.client.UpdateItem(context.Background(), &dynamodb.UpdateItemInput{
 			TableName: aws.String(os.Getenv("TABLE_NAME")),
 			Key: map[string]types.AttributeValue{
 				"PK": &types.AttributeValueMemberS{Value: pkOrder},
