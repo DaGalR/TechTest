@@ -8,8 +8,8 @@ import (
 	"os"
 )
 
-func CallOrdersService(orderID string) error {
-	body := map[string]interface{}{"operation": "Update", "order_id": orderID, "item": "itemX", "quantity": 1, "total_price":1.0,"user_id": "dani"}
+func CallUpdateOrdersService(orderID string) error {
+	body := map[string]interface{}{"order_id": orderID, "new_status": "Ready for shipping"}
 	jsonData, err := json.Marshal(body)
 	fmt.Printf("RAW BODY %v\n", body)
 	if err != nil{

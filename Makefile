@@ -1,14 +1,18 @@
 build:
-	GOOS=linux GOARCH=amd64 go build -v -ldflags '-d -s -w' -a -tags netgo -installsuffix netgo -o build/bin/app .
-
+	cd lambdas/create_order/ && env GOOS=linux GOARCH=amd64 go build -o ../../bin/create_order
+	cd lambdas/create_payment/ && env GOOS=linux GOARCH=amd64 go build -o ../../bin/create_payment
+	cd lambdas/sqs_handler && env GOOS=linux GOARCH=amd64 go build -o ../../bin/sqs_handler
+	cd lambdas/update_order/ && env GOOS=linux GOARCH=amd64 go build -o ../../bin/update_order
+setenv:
+	export AWS_ACCESS_KEY_ID=AKIAT724GV2MVPFYKLPZ && export AWS_SECRET_ACCESS_KEY=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
 init:
-	terraform init infra
+	cd infra/ && terraform init
 
 plan:
-	terraform plan infra
+	cd infra/ && terraform plan
 
 apply:
-	terraform apply --auto-approve infra
+	cd infra/ && terraform apply --auto-approve
 
 destroy:
-	terraform destroy --auto-approve infra
+	cd infra/ && terraform destroy --auto-approve

@@ -103,6 +103,12 @@ data "archive_file" "create-payment-archive"{
   type = "zip"
 }
 
+data "archive_file" "update-order-archive"{
+  source_file = "../bin/update_order"
+  output_path = "../bin/update_order.zip"
+  type = "zip"
+}
+
 data "archive_file" "sqs-handler-archive"{
   source_file = "../bin/sqs_handler"
   output_path = "../bin/sqs_handler.zip"
@@ -143,10 +149,27 @@ resource "aws_lambda_function" "create-payment" {
   filename = data.archive_file.create-payment-archive.output_path
 }
 
+resource "aws_lambda_function" "update-order" {
+  environment {
+    variables = {
+      TABLE_NAME = aws_dynamodb_table.transactions_table.name,
+    }
+  }
+  memory_size = "128"
+  timeout = 10
+  runtime = "go1.x"
+  architectures = ["x86_64"]
+  function_name = "update_order"
+  handler = "update_order"
+  role = aws_iam_role.iam_for_lambda.arn
+  filename = data.archive_file.update-order-archive.output_path
+
+}
+
 resource "aws_lambda_function" "lambda_sqs_handler" {
   environment {
     variables = {
-      ORDERS_URL = "${aws_api_gateway_deployment.transactions_deploy.invoke_url}${aws_api_gateway_resource.order-resource.path}"
+      ORDERS_URL = "${aws_api_gateway_deployment.transactions_deploy.invoke_url}${aws_api_gateway_resource.update-order-resource.path}"
     }
   }
   memory_size = "128"
@@ -175,6 +198,12 @@ resource "aws_api_gateway_resource" "payment-resource" {
   rest_api_id = "${aws_api_gateway_rest_api.api.id}"
 }
 
+resource "aws_api_gateway_resource" "update-order-resource" {
+  path_part   = "update-order"
+  parent_id   = "${aws_api_gateway_rest_api.api.root_resource_id}"
+  rest_api_id = "${aws_api_gateway_rest_api.api.id}"
+}
+
 #MODEL AND VALIDATOR FOR CUSTOM REQUEST
 resource "aws_api_gateway_model" "create-order-req" {
   rest_api_id  = aws_api_gateway_rest_api.api.id
@@ -186,6 +215,21 @@ resource "aws_api_gateway_model" "create-order-req" {
 
 resource "aws_api_gateway_request_validator" "create-order-validator" {
   name                        = "POSTRequestModelCreateOrder"
+  rest_api_id                 = aws_api_gateway_rest_api.api.id
+  validate_request_body       = true
+  validate_request_parameters = false
+}
+
+resource "aws_api_gateway_model" "update-order-req" {
+  rest_api_id  = aws_api_gateway_rest_api.api.id
+  name         = "POSTRequestModelUpdateOrder"
+  description  = "A JSON schema"
+  content_type = "application/json"
+  schema       = file("${path.module}/update_order.json")
+}
+
+resource "aws_api_gateway_request_validator" "update-order-validator" {
+  name                        = "POSTRequestModelUpdateOrder"
   rest_api_id                 = aws_api_gateway_rest_api.api.id
   validate_request_body       = true
   validate_request_parameters = false
@@ -227,6 +271,16 @@ resource "aws_api_gateway_method" "create-payment-method" {
     "application/json" = aws_api_gateway_model.create-payment-req.name
   }
 }
+resource "aws_api_gateway_method" "update-order-method" {
+  rest_api_id   = "${aws_api_gateway_rest_api.api.id}"
+  resource_id   = "${aws_api_gateway_resource.update-order-resource.id}"
+  http_method   = "POST"
+  authorization = "NONE"
+  request_validator_id = aws_api_gateway_request_validator.update-order-validator.id
+  request_models = {
+    "application/json" = aws_api_gateway_model.update-order-req.name
+  }
+}
 resource "aws_api_gateway_method_response" "create-order-response" {
   rest_api_id = aws_api_gateway_rest_api.api.id
   resource_id = aws_api_gateway_resource.order-resource.id
@@ -237,6 +291,12 @@ resource "aws_api_gateway_method_response" "create-payment-response" {
   rest_api_id = aws_api_gateway_rest_api.api.id
   resource_id = aws_api_gateway_resource.payment-resource.id
   http_method = aws_api_gateway_method.create-payment-method.http_method
+  status_code = "200"
+}
+resource "aws_api_gateway_method_response" "update-order-response" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  resource_id = aws_api_gateway_resource.update-order-resource.id
+  http_method = aws_api_gateway_method.update-order-method.http_method
   status_code = "200"
 }
 #INTEGRATIONS WITH LAMBDAS
@@ -254,6 +314,21 @@ resource "aws_api_gateway_integration_response" "create-order-integration-res" {
   resource_id = aws_api_gateway_resource.order-resource.id
   http_method = aws_api_gateway_method.create-order-method.http_method
   status_code = aws_api_gateway_method_response.create-order-response.status_code
+}
+resource "aws_api_gateway_integration" "update-order-integration" {
+  rest_api_id             = "${aws_api_gateway_rest_api.api.id}"
+  resource_id             = "${aws_api_gateway_resource.update-order-resource.id}"
+  http_method             = "${aws_api_gateway_method.update-order-method.http_method}"
+  integration_http_method = "POST"
+  type                    = "AWS"
+  uri                     = "${aws_lambda_function.update-order.invoke_arn}"
+}
+resource "aws_api_gateway_integration_response" "update-order-integration-res" {
+  depends_on  = [aws_api_gateway_integration.update-order-integration]
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  resource_id = aws_api_gateway_resource.update-order-resource.id
+  http_method = aws_api_gateway_method.update-order-method.http_method
+  status_code = aws_api_gateway_method_response.update-order-response.status_code
 }
 resource "aws_api_gateway_integration" "create-payment-integration" {
   rest_api_id             = "${aws_api_gateway_rest_api.api.id}"
@@ -280,6 +355,15 @@ resource "aws_lambda_permission" "apigw-create-order-lambda" {
   source_arn = "${aws_api_gateway_rest_api.api.execution_arn}/*/*/*"
 }
 
+resource "aws_lambda_permission" "apigw-update-order-lambda" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = "${aws_lambda_function.update-order.function_name}"
+  principal     = "apigateway.amazonaws.com"
+
+  source_arn = "${aws_api_gateway_rest_api.api.execution_arn}/*/*/*"
+}
+
 resource "aws_lambda_permission" "apigw-create-payment-lambda" {
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"
@@ -291,7 +375,7 @@ resource "aws_lambda_permission" "apigw-create-payment-lambda" {
 
 #API GATEWAY DEPLOY
 resource "aws_api_gateway_deployment" "transactions_deploy" {
-  depends_on = [aws_api_gateway_integration.create-order-integration, aws_api_gateway_integration.create-payment-integration]
+  depends_on = [aws_api_gateway_integration.create-order-integration, aws_api_gateway_integration.create-payment-integration, aws_api_gateway_integration.update-order-integration]
 
   rest_api_id = "${aws_api_gateway_rest_api.api.id}"
   stage_name  = "v1"
@@ -324,8 +408,11 @@ output "sqs-url"{
   value = "${aws_sqs_queue.terraform_queue.id}"
 }
 
-output "url-order" {
+output "url-create-order" {
   value = "${aws_api_gateway_deployment.transactions_deploy.invoke_url}${aws_api_gateway_resource.order-resource.path}"
+}
+output "url-update-order" {
+  value = "${aws_api_gateway_deployment.transactions_deploy.invoke_url}${aws_api_gateway_resource.update-order-resource.path}"
 }
 output "url-payment" {
   value = "${aws_api_gateway_deployment.transactions_deploy.invoke_url}${aws_api_gateway_resource.payment-resource.path}"

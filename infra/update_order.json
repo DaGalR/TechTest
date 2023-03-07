@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "POST /create-payment",
+  "type": "object",
+  "properties": {
+    "order_id": { "type": "string" },
+    "new_status": { "type": "string" }
+  },
+  "required": ["order_id", "new_status"],
+  "additionalProperties": false
+}

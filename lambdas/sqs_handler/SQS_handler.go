@@ -15,7 +15,7 @@ func sqsHandler(ctx context.Context, sqsEvents events.SQSEvent) (events.APIGatew
 		if message.Body == "Order_Completed"{
 			orderid := *message.MessageAttributes["OrderID"].StringValue
 			fmt.Printf("Recevied Order_Complete event with orderID: %s\n", orderid)
-			err := adapters.CallOrdersService(orderid)
+			err := adapters.CallUpdateOrdersService(orderid)
 			if err != nil{
 				return events.APIGatewayProxyResponse{StatusCode: 400, Body: fmt.Sprintf("Error sending request to API: %s", err.Error())}, err
 			}
