@@ -116,7 +116,7 @@ func UpdateOrderStatusDynamo(orderID string, newStatus string, client *dynamodb.
 			if err != nil {
 				return attributeMap, fmt.Errorf("Couldn't unmarshall update response: %v\n", err)
 			}
-			fmt.Printf("Order with id %s was succesfuly updated with status complete", orderID)
+			fmt.Printf("Order with id %s was succesfuly updated with status %s", orderID, newStatus)
 		}
 		return attributeMap, err
 	}
