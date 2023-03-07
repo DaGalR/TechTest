@@ -3,12 +3,20 @@
   "title": "POST /create-order",
   "type": "object",
   "properties": {
+    "operation": { "type": "string" },
     "order_id": { "type": "string" },
     "user_id": { "type": "string" },
     "item": { "type": "string" },
     "quantity": { "type": "integer" },
     "total_price": { "type": "number" }
   },
-  "required": ["order_id", "user_id", "item", "quantity", "total_price"],
+  "required": [
+    "order_id",
+    "user_id",
+    "item",
+    "quantity",
+    "total_price",
+    "operation"
+  ],
   "additionalProperties": false
 }

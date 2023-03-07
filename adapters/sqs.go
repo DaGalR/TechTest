@@ -33,6 +33,24 @@ func SendOrderCreatedEvent(body string, attributes *dto.CreateOrderEvent, sqsCli
 	return res.MessageId, nil
 }
 
+func SendPaymentCreatedEvent(body , orderID string, sqsClient *sqs.Client) (*string, error) {
+	msgInput := &sqs.SendMessageInput{
+		MessageAttributes: map[string]types.MessageAttributeValue{
+			"OrderID": {
+				DataType:    aws.String("String"),
+				StringValue: aws.String(orderID),
+			},
+		},
+		MessageBody: aws.String(body),
+		QueueUrl:    aws.String(os.Getenv("SQS_QUEUE")),
+	}
+	res, err := sqsClient.SendMessage(context.Background(), msgInput)
+	if err!=nil{
+		return nil, fmt.Errorf("There was an error sending the Order Completed Event message: %s", err.Error())
+	}
+	return res.MessageId, nil
+}
+
 func ReceiveMessage(sqsClient *sqs.Client) error{
 	queueInput := &sqs.ReceiveMessageInput{
 		MessageAttributeNames: []string{

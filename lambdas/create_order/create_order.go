@@ -24,25 +24,45 @@ func createOrderDynamo(order *dto.CreateOrderRequest, client *dynamodb.Client) e
 	return nil
 }
 
+func setOrderReadyForShipping(order *dto.CreateOrderRequest, client *dynamodb.Client) error{
+	_, err := adapters.UpdateOrderStatusDynamo(order.OrderID, "Ready for shipping", client)
+	if err != nil{
+		return fmt.Errorf("The order could not be updated")
+	}
+	return nil
+}
 
-func CreateOrderHandler(ctx context.Context, order dto.CreateOrderRequest) (events.APIGatewayProxyResponse, error) {
+func OrdersHandler(ctx context.Context, order dto.CreateOrderRequest) (events.APIGatewayProxyResponse, error) {
 	config, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(os.Getenv("AWS_REGION")))
 	if err!=nil{
 		return events.APIGatewayProxyResponse{StatusCode: 500, Body: "Error initializing DynamoDB client"} , err
 	}
 	sqsClient := sqs.NewFromConfig(config)
 	client := dynamodb.NewFromConfig(config)
-	err = createOrderDynamo(&order, client)
-	if err != nil{
-		return events.APIGatewayProxyResponse{StatusCode: 500, Body: err.Error()}, err
+	if order.Operation == "Create"{
+		err = createOrderDynamo(&order, client)
+		if err != nil{
+			return events.APIGatewayProxyResponse{StatusCode: 400, Body: err.Error()}, err
+		}
+		var order_created_event dto.CreateOrderEvent
+		order_created_event.OrderID = order.OrderID
+		order_created_event.TotalPrice = order.TotalPrice
+		adapters.SendOrderCreatedEvent("Order_Created", &order_created_event, sqsClient)
+		if err != nil{
+			return events.APIGatewayProxyResponse{StatusCode: 400, Body: fmt.Sprintf("The order has been created but no event was sent to SQS: %s", err.Error())}, err
+		}
+		return events.APIGatewayProxyResponse{StatusCode: 200, Body: fmt.Sprintf("Order created with: %s USER: %s ITEM: %s QUANT: %d PRICE: %.2f", order.OrderID, order.UserID, order.Item, order.Quantity, order.TotalPrice)}, nil
+	}else if order.Operation == "Update"{
+		err = setOrderReadyForShipping(&order, client)
+		if err != nil{
+			return events.APIGatewayProxyResponse{StatusCode: 400, Body: err.Error()}, err
+		}
+		return events.APIGatewayProxyResponse{StatusCode: 200, Body: fmt.Sprintf("Order updated with: Status: Ready for shipping")}, nil
+	}else{
+		return events.APIGatewayProxyResponse{StatusCode: 404, Body: fmt.Sprintf("Operation %s is not valid", order.Operation)}, fmt.Errorf("Operation %s is not valid", order.Operation)
 	}
-	var order_created_event dto.CreateOrderEvent
-	order_created_event.OrderID = order.OrderID
-	order_created_event.TotalPrice = order.TotalPrice
-	adapters.SendOrderCreatedEvent("Order_Created", &order_created_event, sqsClient)
-	return events.APIGatewayProxyResponse{StatusCode: 200, Body: fmt.Sprintf("Order created with: %s USER: %s ITEM: %s QUANT: %d PRICE: %.2f", order.OrderID, order.UserID, order.Item, order.Quantity, order.TotalPrice)}, nil
 }
 
 func main(){
-	lambda.Start(CreateOrderHandler)
+	lambda.Start(OrdersHandler)
 }

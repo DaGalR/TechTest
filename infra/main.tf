@@ -144,6 +144,11 @@ resource "aws_lambda_function" "create-payment" {
 }
 
 resource "aws_lambda_function" "lambda_sqs_handler" {
+  environment {
+    variables = {
+      ORDERS_URL = "${aws_api_gateway_deployment.transactions_deploy.invoke_url}${aws_api_gateway_resource.order-resource.path}"
+    }
+  }
   memory_size = "128"
   timeout = 10
   runtime = "go1.x"
