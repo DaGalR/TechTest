@@ -44,7 +44,7 @@ func (s *Service) CreateOrder(order *dto.CreateOrderRequest) error {
 	order_created_event.TotalPrice = order.TotalPrice
 	msgID, err = s.txDomain.SendOrderCreatedEvent("Order_Created",&order_created_event)
 	if err != nil{
-		return fmt.Errorf("The order with ID %s has been created but the order created event could not be sent: %s",order.OrderID,err.Error())
+		return fmt.Errorf("The order with ID %s has been created but the order created event could not be sent",order.OrderID)
 	}
 	fmt.Printf("Order created and sent event with message ID: %s",*msgID)
 	return nil
