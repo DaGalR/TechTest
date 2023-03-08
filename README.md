@@ -51,7 +51,7 @@ You should use make destroy only when you are done reviewing the live architectu
 
 To send requests to the API Gateway, you should select the api gateway named "transactions-api" from the console, then you will see te entrypoints calld "ORDER", "PAYMENT" and "UPDATE-ORDER".
 
-The app working flow should be: send an order, (which will appear in the Dynamo table called "transactions_table") and then send a payment (which will also appear in the same table. Also note that the order status will change from "Incomplete" to "Ready for shipping" after the payment was correctly received.). To send the body for the endpoints, you should use JSON objects like the following: (These objects are to be used as input in "Request Body" field when clicking the "TEST" button on the desired entrypoint or also you can use POSTMAN, create a POST method with the URL of each lambda which you get from the "make apply" command output and set the request body)
+The app working flow should be: send an order, (which will appear in the Dynamo table called "transactions_table") and then send a payment (which will also appear in the same table. Also note that the order status will change from "Incomplete" to "Ready for shipping" after the payment was correctly received. This is not instant, takes a few seconds to see the change). To send the body for the endpoints, you should use JSON objects like the following: (These objects are to be used as input in "Request Body" field when clicking the "TEST" button on the desired entrypoint or also you can use POSTMAN, create a POST method with the URL of each lambda which you get from the "make apply" command output and set the request body)
 
 - For order entrypoint:
 
