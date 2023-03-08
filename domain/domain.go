@@ -27,12 +27,12 @@ func (d *TxDomain) CreateOrder(order *dto.CreateOrderRequest) error {
 	}
 	return nil
 }
-func (d *TxDomain) UpdateOrderStatus(orderID string, newStatus string) (map[string]map[string]interface{}, error){
-	res, err := d.repository.UpdateOrderStatus(orderID,newStatus)
+func (d *TxDomain) UpdateOrderStatus(orderID string, newStatus string) error{
+	err := d.repository.UpdateOrderStatus(orderID,newStatus)
 	if err != nil{
-		return res, err
+		return err
 	}
-	return res,nil
+	return nil
 }
 func (d *TxDomain) CreatePayment(payment *dto.CreatePaymentRequest) error{
 	err := d.repository.CreatePayment(payment)

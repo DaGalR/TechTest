@@ -54,9 +54,9 @@ func (d *DynamoAdapter) CreateOrder(order *dto.CreateOrderRequest) error {
 func (d *DynamoAdapter) CreatePayment(payment *dto.CreatePaymentRequest) error{
 	order, err := d.GetOrder(payment.OrderID)
 	if err != nil{
-		return fmt.Errorf("Could not verify if order with id: " + payment.OrderID + " exists because of: " + err.Error())
+		return fmt.Errorf("Could not verify if order with id: " + payment.OrderID + " exists because of internal server error")
 	}
-	if order == (&dto.CreateOrderRequest{}){
+	if err == nil && order == (&dto.CreateOrderRequest{}){
 		return fmt.Errorf("There is no order with id: "+ payment.OrderID)
 	}else{
 		_, err = d.client.PutItem(context.Background(), &dynamodb.PutItemInput{
@@ -85,7 +85,7 @@ func (d *DynamoAdapter) GetOrder(orderID string) (*dto.CreateOrderRequest, error
 			"SK": &types.AttributeValueMemberS{Value: fmt.Sprintf(skOrder, orderID)},
 		},
 	},)
-	fmt.Printf("commerce data %v\n", data.Item)
+	fmt.Printf("order data %v\n", data.Item)
 	if err!=nil{
 		return &order, fmt.Errorf("There was an error retrieving data from Dynamo")
 	}
@@ -94,20 +94,18 @@ func (d *DynamoAdapter) GetOrder(orderID string) (*dto.CreateOrderRequest, error
 	}
 	err = attributevalue.UnmarshalMap(data.Item, &order)
 	if err != nil{
-		return &order, fmt.Errorf("UnmarshalMap: %v", err)
+		return &dto.CreateOrderRequest{}, fmt.Errorf("UnmarshalMap: %v", err)
 	}
 	return &order,nil
 }
 
-func (d *DynamoAdapter) UpdateOrderStatus(orderID string, newStatus string)(map[string]map[string]interface{}, error){
+func (d *DynamoAdapter) UpdateOrderStatus(orderID string, newStatus string) error{
 	update := expression.Set(expression.Name("status"), expression.Value(newStatus))
 	expr, err := expression.NewBuilder().WithUpdate(update).Build()
-	var response *dynamodb.UpdateItemOutput
-	var attributeMap map[string]map[string]interface{}
 	if err != nil{
-		return attributeMap, fmt.Errorf("Couldn't build expression for order update: %v\n",err)
+		return fmt.Errorf("Couldn't build expression for order update: %v\n",err)
 	}else{
-		response, err = d.client.UpdateItem(context.Background(), &dynamodb.UpdateItemInput{
+		_, err = d.client.UpdateItem(context.Background(), &dynamodb.UpdateItemInput{
 			TableName: aws.String(os.Getenv("TABLE_NAME")),
 			Key: map[string]types.AttributeValue{
 				"PK": &types.AttributeValueMemberS{Value: pkOrder},
@@ -118,14 +116,8 @@ func (d *DynamoAdapter) UpdateOrderStatus(orderID string, newStatus string)(map[
 			UpdateExpression: expr.Update(),
 		})
 		if err != nil {
-			return attributeMap, fmt.Errorf("Couldn't update order with id: %s Because of this: %v\n", orderID, err)
-		}else{
-			err = attributevalue.UnmarshalMap(response.Attributes, &attributeMap)
-			if err != nil {
-				return attributeMap, fmt.Errorf("Couldn't unmarshall update response: %v\n", err)
-			}
-			fmt.Printf("Order with id %s was succesfuly updated with status %s", orderID, newStatus)
+			return fmt.Errorf("Couldn't update order with id: %s", orderID)
 		}
-		return attributeMap, err
+		return nil
 	}
 }

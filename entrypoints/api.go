@@ -7,7 +7,7 @@ type API struct {
 }
 type Service interface {
 	CreateOrder(*dto.CreateOrderRequest) error
-	UpdateOrderStatus(string, string) (map[string]map[string]interface{}, error)
+	UpdateOrderStatus(string, string) error
 	CreatePayment(*dto.CreatePaymentRequest) error
 	CallUpdateOrdersService(string,string) error
 }
@@ -26,12 +26,12 @@ func (a *API) CreateOrder(order *dto.CreateOrderRequest) error{
 	return nil
 }
 
-func (a *API) UpdateOrderStatus(orderID, newStatus string) (map[string]map[string]interface{}, error){
-	attributeMap , err := a.service.UpdateOrderStatus(orderID, newStatus)
+func (a *API) UpdateOrderStatus(orderID, newStatus string) error{
+	err := a.service.UpdateOrderStatus(orderID, newStatus)
 	if err != nil{
-		return nil, err
+		return err
 	}
-	return attributeMap, nil
+	return nil
 }
 
 func (a *API) CreatePayment(payment *dto.CreatePaymentRequest) error{

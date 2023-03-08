@@ -12,7 +12,7 @@ type Domain interface {
 	//Dynamo methods
 	GetOrder(string)(*dto.CreateOrderRequest, error)
 	CreateOrder(*dto.CreateOrderRequest) error
-	UpdateOrderStatus(string, string,) (map[string]map[string]interface{}, error)
+	UpdateOrderStatus(string, string,) error
 	CreatePayment(*dto.CreatePaymentRequest) error
 	//SQS Methods
 	SendOrderCreatedEvent(string, *dto.CreateOrderEvent)(*string, error)
@@ -72,10 +72,10 @@ func (s *Service) CallUpdateOrdersService(orderID, newStatus string) error{
 	return nil
 }
 
-func (s *Service) UpdateOrderStatus(orderID string, newStatus string)(map[string]map[string]interface{}, error){
-	res, err := s.txDomain.UpdateOrderStatus(orderID,newStatus)
+func (s *Service) UpdateOrderStatus(orderID string, newStatus string)error{
+	err := s.txDomain.UpdateOrderStatus(orderID,newStatus)
 	if err != nil{
-		return res,err
+		return err
 	}
-	return res, nil
+	return nil
 }

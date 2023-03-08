@@ -25,7 +25,7 @@ func UpdateOrderHandler(ctx context.Context, order *dto.UpdateOrderRequest) (eve
 		return events.APIGatewayProxyResponse{StatusCode: 500, Body: "Error initializing DynamoDB client"} , err
 	}
 	client := dynamodb.NewFromConfig(config)*/
-	_, err := myAPI.UpdateOrderStatus(order.OrderID, order.NewStatus)
+	err := myAPI.UpdateOrderStatus(order.OrderID, order.NewStatus)
 	if err != nil{
 		return events.APIGatewayProxyResponse{StatusCode: 400, Body: fmt.Sprintf("Could not update order with ID: %s because of: %s", order.OrderID, err.Error())}, err
 	}
